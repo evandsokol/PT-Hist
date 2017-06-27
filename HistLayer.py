@@ -39,7 +39,7 @@ class HistLayer(nn.Module):
         self.D_out = D_out
 
         # allocate space for backprop gradient values(?)
-        self.gradient = torch.IntTensor(D_out[0], D_out[1], D_in[0], D_in[1]).zero_()
+        self.gradient = torch.IntTensor(D_out[0], D_out[1], len(histBins), D_in[0], D_in[1]).zero_()
 
     def bin_img(self, img):
         #input is a window of full image, holds float values
@@ -48,27 +48,24 @@ class HistLayer(nn.Module):
         #mode holds the frequency of the most popular bin, holds int
         #modeBin holds the bin value with the highest frequencies, holds float
 
-        output = torch.IntTensor(self.filt_dim[0], self.filt_dim[1]).zero_()
-        histFreq = np.zeros((self.numBins), dtype=np.intp)
+        binnedImg = torch.IntTensor(self.filt_dim[0], self.filt_dim[1]).zero_()
+        histFreq = torch.FloatTensor(self.numBins).zero_()
         for i in range(0, self.filt_dim[0]):
             for j in range(0, self.filt_dim[1]):
                 for k in range(0, self.numBins):
-                    # print("img["+str(i)+", "+ str(j) +"] = ",img[i,j])
                     if img[i, j] <= self.histBins[k]:
-                        # print("histBin["+str(k)+"] = ", histBins[k])
-                        output[i, j] = k
+                        binnedImg[i, j] = k
                         break
-
                 histFreq[k] += 1
-        modeFreq = np.max(histFreq)
-        modeBin = np.argmax(histFreq)
-        return output, modeFreq, modeBin
-
+        return binnedImg, histFreq
 
     def forward(self, xx):
         ## xx is the input and is a torch.tensor
+        ##output is output of the layer
+        ##each element of output is the frequency for the bin for that window
+
         p = self.padding #layer padding
-        output = torch.FloatTensor(torch.zeros(self.D_out)) ##tensor for output
+        output = torch.FloatTensor(torch.zeros(self.D_out[0], self.D_out[1], self.numBins)) ##tensor for output
 
         ##pad input
         ##inserting input into a larger array filled with pad values
@@ -77,30 +74,31 @@ class HistLayer(nn.Module):
         temp_in[p:self.D_in[0]+1, p:self.D_in[1]+1] = xx
 
         ##operate on padded input
-        for i in range(0, self.D_in[0], self.stride[0]): #row/height loop
-            out_i = int(i / self.stride[0])
-            for j in range(0, self.D_in[1], self.stride[1]): #column/width loop
-                out_j = int(j/self.stride[1])
-                temp_window = xx[i:i+filt_dim[0], j:j+filt_dim[1]] #isolate window
-                temp_binned, mode_freq, modeBin = self.bin_img(temp_window)
-                # print(temp_binned, mode_freq, modeBin)
-                output[out_i, out_j] = float(modeBin)
-                self.gradient[out_i, out_j, i:i+filt_dim[0], j:j+filt_dim[1]] = temp_binned.eq(int(modeBin))
+        for i in range(0, self.D_out[0]): #row/height loop
+            i_in = self.stride[0]*i
+            for j in range(0, self.D_out[1]): #column/width loop
+                j_in = self.stride[1]*j
+                for k in range(0, self.numBins):
+                    temp_window = xx[i_in:i_in+filt_dim[0], j_in:j_in+filt_dim[1]] #isolate input window
+                    temp_binned, histFreqs = self.bin_img(temp_window)
+                    output[i, j, k] = histFreqs[k]
+                    self.gradient[i, j, k, i_in:i_in+filt_dim[0], j_in:j_in+filt_dim[1]] = temp_binned.eq(int(histFreqs[k]))
         return output
 
 
     def backward(self, grad_output):
 
         #initialize backprop tensor
-        backprop = torch.zeros(self.D_out[0], self.D_out[1], self.D_in[0], self.D_in[1]) #float tensor
-        # print(self.gradient)
+        backprop = torch.zeros(self.D_in[0], self.D_in[1]) #float tensor
+
         #for each previsouly outputted element
-        for i in range(0, self.D_in[0], self.stride[0]): #row/height loop
-            out_i = int(i / self.stride[0])
-            for j in range(0, self.D_in[1], self.stride[1]): #column/width loop
-                out_j = int(j / self.stride[1])
-                # print(grad_output[out_i,out_j], self.gradient[out_i,out_j])
-                backprop[out_i,out_j] = self.gradient[out_i,out_j].float()*grad_output[out_i,out_j]
+        # for i in range(0, self.D_out[0]): #row/height loop
+        #     i_in = self.stride[0]*i
+        #     for j in range(0, self.D_out[1]): #column/width loop
+        #         j_in = self.stride[1]*j
+        #         # print(grad_output[out_i,out_j], self.gradient[out_i,out_j])
+        #         backprop[i_in:i_in+self.stride[0],j_in:j_in+self.stride[1]] = torch.matmul(self.gradient[i,j].float(),
+        backprop = self.matmul(self.gradient.float(), grad_output)
         return backprop
 
     def zero_grad(self):
