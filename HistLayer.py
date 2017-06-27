@@ -44,9 +44,8 @@ class HistLayer(nn.Module):
     def bin_img(self, img):
         #input is a window of full image, holds float values
         #output is a the binned window, holds histBin indices/ints
-        #modeVect holds histogram frequencies, holds ints
-        #mode holds the frequency of the most popular bin, holds int
-        #modeBin holds the bin value with the highest frequencies, holds float
+
+
 
         binnedImg = torch.IntTensor(self.filt_dim[0], self.filt_dim[1]).zero_()
         histFreq = torch.FloatTensor(self.numBins).zero_()
@@ -57,6 +56,7 @@ class HistLayer(nn.Module):
                         binnedImg[i, j] = k
                         break
                 histFreq[k] += 1
+        print(binnedImg, histFreq)
         return binnedImg, histFreq
 
     def forward(self, xx):
@@ -82,7 +82,7 @@ class HistLayer(nn.Module):
                     temp_window = xx[i_in:i_in+filt_dim[0], j_in:j_in+filt_dim[1]] #isolate input window
                     temp_binned, histFreqs = self.bin_img(temp_window)
                     output[i, j, k] = histFreqs[k]
-                    self.gradient[i, j, k, i_in:i_in+filt_dim[0], j_in:j_in+filt_dim[1]] = temp_binned.eq(int(histFreqs[k]))
+                    self.gradient[i, j, k, i_in:i_in+filt_dim[0], j_in:j_in+filt_dim[1]] = temp_binned.eq(k)
         return output
 
 
@@ -92,13 +92,11 @@ class HistLayer(nn.Module):
         backprop = torch.zeros(self.D_in[0], self.D_in[1]) #float tensor
 
         #for each previsouly outputted element
-        # for i in range(0, self.D_out[0]): #row/height loop
-        #     i_in = self.stride[0]*i
-        #     for j in range(0, self.D_out[1]): #column/width loop
-        #         j_in = self.stride[1]*j
-        #         # print(grad_output[out_i,out_j], self.gradient[out_i,out_j])
-        #         backprop[i_in:i_in+self.stride[0],j_in:j_in+self.stride[1]] = torch.matmul(self.gradient[i,j].float(),
-        backprop = self.matmul(self.gradient.float(), grad_output)
+        for i in range(0, self.D_out[0]): #row/height loop
+            for j in range(0, self.D_out[1]): #column/width loop
+                for k in range(0, self.numBins):
+                    # print(self.gradient[i,j,k])
+                    backprop+= grad_output[i,j,k]*self.gradient[i,j,k].float()
         return backprop
 
     def zero_grad(self):
@@ -115,6 +113,7 @@ testWin = torch.ones(filt_dim)
 
 input = torch.zeros(D_in)
 input[6:9,2:7] = 1.0
+# print(input)
 
 net = HistLayer(D_in, padding, stride, filt_dim, histBins)
 # print(net.bin_img(testWin))
@@ -122,8 +121,16 @@ net = HistLayer(D_in, padding, stride, filt_dim, histBins)
 
 # print(input)
 yy = net.forward(input)
-print((net.gradient.size()))
 # print(yy)
+# for i in range(0, net.D_out[0]):
+#     for j in range(0, net.D_out[1]):
+#         print(yy[i,j])
 zz = net.backward(yy)
-print(yy)
-print(zz[2,0])
+for i in range(0, net.D_out[0]):
+    for j in range(0, net.D_out[1]):
+        for k in range(0, net.numBins):
+            print(k, net.gradient[i,j,k])
+# print(yy.size())
+# pp = (np.rollaxis(np.rollaxis(yy.numpy(),0,2), 1,2))
+# print(pp.size)
+# print(pp)
