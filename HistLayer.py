@@ -1,9 +1,8 @@
 
-# %windir%\system32\cmd.exe "/K" C:\Users\evands\AppData\Local\Anaconda3.6\Scripts\activate.bat C:\Users\evands\AppData\Local\Anaconda3.6
-import torch.nn as nn
-import torch
 import math
-import numpy as np
+
+import torch
+import torch.nn as nn
 
 
 class HistLayer(nn.Module):
@@ -103,34 +102,37 @@ class HistLayer(nn.Module):
         ##zero grad output
         self.gradient.zero_()
 
-D_in = [15, 10]
-padding = 0
-stride = [3, 5]
-filt_dim = [3, 5]
-histBins = [0.5, 1]
-
-testWin = torch.ones(filt_dim)
-
-input = torch.zeros(D_in)
-input[6:9,2:7] = 1.0
-# print(input)
-
-net = HistLayer(D_in, padding, stride, filt_dim, histBins)
-# print(net.bin_img(testWin))
 
 
-# print(input)
-yy = net.forward(input)
-# print(yy)
+
+# D_in = [15, 10]
+# padding = 0
+# stride = [3, 5]
+# filt_dim = [3, 5]
+# histBins = [0.5, 1]
+#
+# testWin = torch.ones(filt_dim)
+#
+# input = torch.zeros(D_in)
+# input[6:9,2:7] = 1.0
+# # print(input)
+#
+# net = HistLayer(D_in, padding, stride, filt_dim, histBins)
+# # print(net.bin_img(testWin))
+#
+#
+# # print(input)
+# yy = net.forward(input)
+# # print(yy)
+# # for i in range(0, net.D_out[0]):
+# #     for j in range(0, net.D_out[1]):
+# #         print(yy[i,j])
+# zz = net.backward(yy)
 # for i in range(0, net.D_out[0]):
 #     for j in range(0, net.D_out[1]):
-#         print(yy[i,j])
-zz = net.backward(yy)
-for i in range(0, net.D_out[0]):
-    for j in range(0, net.D_out[1]):
-        for k in range(0, net.numBins):
-            print(k, net.gradient[i,j,k])
-# print(yy.size())
-# pp = (np.rollaxis(np.rollaxis(yy.numpy(),0,2), 1,2))
-# print(pp.size)
-# print(pp)
+#         for k in range(0, net.numBins):
+#             print(k, net.gradient[i,j,k])
+# # print(yy.size())
+# # pp = (np.rollaxis(np.rollaxis(yy.numpy(),0,2), 1,2))
+# # print(pp.size)
+# # print(pp)
